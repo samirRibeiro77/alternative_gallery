@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:alternative_gallery/data/user_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -15,12 +18,31 @@ class UserModel extends Model {
   static UserModel of(BuildContext context) =>
       ScopedModel.of<UserModel>(context);
 
-  bool _isLoading = false;
+  bool isLoading = false;
+  bool passwordChecked = false;
 
-  bool get isLoggedin => user != null;
+  bool get isLoggedin => _firebaseUser != null;
+  
+  void _startLoading() {
+    isLoading = true;
+    notifyListeners();
+  }
+
+  void _finishLoading() {
+    isLoading = false;
+    notifyListeners();
+  }
+
+  @override
+  void addListener(VoidCallback listener) async {
+    super.addListener(listener);
+    _startLoading();
+    await _loadUser();
+    _finishLoading();
+  }
 
   Future<Null> login() async {
-    _isLoading = true;
+    _startLoading();
 
     _googleUser = _googleSignIn.currentUser;
     if (_googleUser == null) _googleUser = await _googleSignIn.signInSilently();
@@ -41,19 +63,39 @@ class UserModel extends Model {
       await _saveUser();
     }
 
-    _isLoading = false;
+    //print("User => ${_firebaseUser.uid} // ${_googleUser.displayName} // ${user.email}");
+
+    _finishLoading();
   }
 
   void logout() {
-    _isLoading = true;
+    _startLoading();
 
-    _isLoading = false;
+    _finishLoading();
   }
 
   void checkPassword(String password) {
-    _isLoading = true;
+    _startLoading();
 
-    _isLoading = false;
+    var bytes = utf8.encode(password);
+    var cryptoPassword = sha256.convert(bytes);
+
+    passwordChecked = user.password.toLowerCase() == cryptoPassword.toString().toLowerCase();
+
+    _finishLoading();
+  }
+
+  void createPassword(String password) async {
+    _startLoading();
+
+    user.password = password;
+    await Firestore.instance.collection("users")
+        .document(user.id).setData(user.toMap());
+
+    passwordChecked = true;
+    notifyListeners();
+
+    _finishLoading();
   }
 
   Future<Null> _saveUser() async {

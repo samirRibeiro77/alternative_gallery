@@ -23,14 +23,17 @@ class UserData {
   }
 
   Map<String, dynamic> toMap() {
-    var bytes = utf8.encode(this._password);
-    var cryptoPassword = sha256.convert(bytes);
+    if (this._password != null) {
+      var bytes = utf8.encode(this._password);
+      var cryptoPassword = sha256.convert(bytes);
+      this._password = cryptoPassword.toString();
+    }
 
     return {
       "name": _name,
       "email": _email,
       "photo": _photo,
-      "password": cryptoPassword.toString(),
+      "password": this._password,
     };
   }
 
@@ -38,4 +41,10 @@ class UserData {
   String get email => _email;
   String get name => _name;
   String get id => _id;
+  String get password => _password;
+
+  set password(value) {
+    _password = value;
+  }
+
 }
